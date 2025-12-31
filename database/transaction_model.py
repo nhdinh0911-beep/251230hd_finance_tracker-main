@@ -103,12 +103,12 @@ class TransactionModel:
         return self._add_user_constraint(conditions)
     
     def _add_user_constraint(self, conditions: list) -> dict:
-        conditions.append({
-            "user_id": ObjectId(self.user_id) if self.user_id else None
-        })
-        return {
-            "$and": conditions
-        }
+        if not self.user_id:
+            raise ValueError("user_id is not set for TransactionModel")
+    
+        conditions.append({"user_id": self.user_id})
+        return {"$and": conditions}
+
     
     def add_transaction(
         self,
