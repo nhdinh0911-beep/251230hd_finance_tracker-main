@@ -129,10 +129,17 @@ class TransactionModel:
 
         if start_date or end_date:
             q["date"] = {}
+
             if start_date:
+                if not isinstance(start_date, datetime):
+                    start_date = datetime.combine(start_date, datetime.min.time())
                 q["date"]["$gte"] = start_date
+        
             if end_date:
+                if not isinstance(end_date, datetime):
+                    end_date = datetime.combine(end_date, datetime.min.time())
                 q["date"]["$lt"] = end_date
+
 
         cursor = self.collection.find(q).sort([("date", -1)]).limit(int(limit))
         return list(cursor)
@@ -196,11 +203,17 @@ class TransactionModel:
 
         match: Dict[str, Any] = {"user_id": self.user_id, "type": tx_type}
         if start_date or end_date:
-            match["date"] = {}
+            q["date"] = {}
+
             if start_date:
-                match["date"]["$gte"] = start_date
+                if not isinstance(start_date, datetime):
+                    start_date = datetime.combine(start_date, datetime.min.time())
+                q["date"]["$gte"] = start_date
+        
             if end_date:
-                match["date"]["$lt"] = end_date
+                if not isinstance(end_date, datetime):
+                    end_date = datetime.combine(end_date, datetime.min.time())
+                q["date"]["$lt"] = end_date
 
         pipeline = [
             {"$match": match},
