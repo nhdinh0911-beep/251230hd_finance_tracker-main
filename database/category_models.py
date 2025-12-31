@@ -50,6 +50,38 @@ class CategoryModel:
                 }
             ).sort("name", 1)
         )
+    # ==================================================
+    # Adapter for UI (DO NOT REMOVE)
+    # ==================================================
+    def upsert_category(self, category_type: str, category_name: str):
+        """
+        Adapter for views/category_view.py
+        UI gọi upsert_category nhưng backend dùng create_category
+        """
+
+        self._require_user()
+
+        category_name = (category_name or "").strip()
+        category_type = (category_type or "").strip()
+
+        if not category_name:
+            raise ValueError("Category name is required")
+
+        if category_type not in ("Income", "Expense"):
+            raise ValueError("Category type must be 'Income' or 'Expense'")
+
+        # Nếu đã tồn tại → báo lỗi nhẹ (UI sẽ hiện message)
+        existing = self.collection.find_one({
+            "user_id": self.user_id,
+            "name": category_name,
+            "type": category_type
+        })
+
+        if existing:
+            raise ValueError("Category already exists")
+
+        # Gọi logic chuẩn
+        return self.create_category(category_name, category_type)
 
     # -----------------------------
     # Helpers
