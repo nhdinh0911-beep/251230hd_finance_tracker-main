@@ -1,4 +1,4 @@
-from .category_model import CategoryModel
+from .category_models import CategoryModel
 from .transaction_model import TransactionModel
 from .user_model import UserModel
 from .budget_model import BudgetModel
