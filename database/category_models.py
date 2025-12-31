@@ -32,6 +32,24 @@ class CategoryModel:
             self.collection.create_index([("user_id", 1), ("type", 1), ("name", 1)], unique=True)
         except Exception:
             pass
+    def get_categories_by_type(self, category_type: str):
+        """
+        Adapter for views/category_view.py
+        category_type: "Expense" | "Income"
+        """
+        self._require_user()
+    
+        if category_type not in ("Expense", "Income"):
+            raise ValueError("category_type must be 'Expense' or 'Income'")
+    
+        return list(
+            self.collection.find(
+                {
+                    "user_id": self.user_id,
+                    "type": category_type,
+                }
+            ).sort("name", 1)
+        )
 
     # -----------------------------
     # Helpers
