@@ -4,7 +4,7 @@ import streamlit as st
 # Page config
 # =====================================================
 st.set_page_config(
-    page_title="Finance Tracker",
+    page_title="Finance Tracker: 251231hd",
     page_icon="💰",
     layout="wide"
 )
