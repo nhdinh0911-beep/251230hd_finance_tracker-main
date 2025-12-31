@@ -1,31 +1,51 @@
 import streamlit as st
-# =====================
+from pymongo import MongoClient
+
+# =====================================================
+# Page config (PHẢI đặt đầu file)
+# =====================================================
+st.set_page_config(
+    page_title="Finance Tracker",
+    page_icon="🤑",
+    layout="wide"
+)
+
+# =====================================================
 # Load secrets
-# =====================
+# =====================================================
 MONGO_URI = st.secrets["MONGO_URI"]
 DATABASE_NAME = st.secrets["DATABASE_NAME"]
 
 AUTH = st.secrets["auth"]
-
 CLIENT_ID = AUTH["client_id"]
 CLIENT_SECRET = AUTH["client_secret"]
 COOKIE_SECRET = AUTH["cookie_secret"]
 REDIRECT_URI = AUTH["redirect_uri"]
 SERVER_METADATA_URL = AUTH["server_metadata_url"]
 
-# import model
+# =====================================================
+# Init MongoDB
+# =====================================================
+@st.cache_resource
+def init_mongo():
+    client = MongoClient(MONGO_URI)
+    return client[DATABASE_NAME]
+
+db = init_mongo()
+
+# =====================================================
+# Import models
+# =====================================================
 from database import (
+    UserModel,
     CategoryModel,
     TransactionModel,
-    UserModel,
     BudgetModel,
 )
 
-# import analytics
 from analytics.analyzer import FinanceAnalyzer
 from analytics.visualizer import FinanceVisualizer
 
-# import view module
 from views import (
     render_categories,
     render_transactions,
@@ -34,111 +54,103 @@ from views import (
     render_budgets,
 )
 
-# initialize models
+# =====================================================
+# Init models (cache per session)
+# =====================================================
 @st.cache_resource
-def init_models():
-    """Initialize and cached models"""
+def init_models(db):
     return {
-        "category": CategoryModel(),
-        "transaction": TransactionModel(),
-        "user": UserModel(),
+        "user": UserModel(db),
+        "category": CategoryModel(db),
+        "transaction": TransactionModel(db),
+        "budget": BudgetModel(db),
         "visualizer": FinanceVisualizer(),
-        "budget": BudgetModel(),
     }
 
-# initialize session per user
-if "models" not in st.session_state:
-    # initialize models
-    st.session_state['models'] = init_models()
+models = init_models(db)
 
-
-models = st.session_state['models']
-
-# Page configuration
-st.set_page_config(
-    page_title = "Finance Tracker",
-    page_icon = "🤑",
-    layout = "wide"
-)
-# =============================================
-# 1. Authen User
-# =============================================
-
+# =====================================================
+# Auth UI
+# =====================================================
 def login_screen():
-    with st.container():
-        st.header("This app is private")
-        st.subheader("Please login to continue")
-        st.button("Login with Google", on_click = st.login)
+    st.title("🔐 Finance Tracker")
+    st.subheader("Ứng dụng riêng tư – vui lòng đăng nhập")
+    st.button("Đăng nhập bằng Google", on_click=st.login)
 
+# =====================================================
+# AUTH FLOW
+# =====================================================
 if not st.user.is_logged_in:
     login_screen()
-else:
-    # Get mongo_user
-    user_model: UserModel = models['user']
-    try:
-        mongo_user_id = user_model.login(st.user.email)
-    except Exception as e:
-        st.error(f"Error during user login: {e}")
-        st.stop()
+    st.stop()
 
-    # set user_id for models
-    # currently we have category and transaction models
-    # you can optimize this by doing it in the model init function
-    models['category'].set_user_id(mongo_user_id)
-    models['transaction'].set_user_id(mongo_user_id)
-     # Budget model cũng cần user_id
-    budget_model = models["budget"]
-    budget_model.set_user_id(mongo_user_id)
+# =====================================================
+# USER LOGIN / CREATE USER IN DB
+# =====================================================
+user_model: UserModel = models["user"]
 
+try:
+    mongo_user_id = user_model.login(st.user.email)
+except Exception as e:
+    st.error(f"❌ Lỗi xử lý user: {e}")
+    st.stop()
 
-    user = st.user.to_dict() # convert google_user to dict
-    user.update({
-        "id": mongo_user_id
-    })
+# =====================================================
+# Set user_id cho các model phụ thuộc user
+# =====================================================
+models["category"].set_user_id(mongo_user_id)
+models["transaction"].set_user_id(mongo_user_id)
+models["budget"].set_user_id(mongo_user_id)
 
-    # Display user profile after update user with mongo_user_id
-    render_user_profile(user_model, user)
+# =====================================================
+# Build user object cho UI
+# =====================================================
+user = st.user.to_dict()
+user["id"] = mongo_user_id
 
-    # init analyzer
-    # because transaction_model has set user_id already in line 74
-    analyzer_model = FinanceAnalyzer(models['transaction'])
-
-    # =============================================
-    # 2. Navigation
-    # =============================================
-
-    page = st.sidebar.radio(
-        "Navigation",
+# =====================================================
+# Sidebar
+# =====================================================
+with st.sidebar:
+    st.write(f"👤 {user.get('email')}")
+    st.divider()
+    page = st.radio(
+        "Điều hướng",
         ["Home", "Category", "Transaction", "Budget"]
     )
+    st.divider()
+    if st.button("🚪 Đăng xuất"):
+        st.logout()
 
+# =====================================================
+# Main views
+# =====================================================
+render_user_profile(user_model, user)
 
-    # =============================================
-    # 3. Router
-    # =============================================
-    if page == "Home":
-        st.title("Home")
-        render_dashboard(analyzer_model=analyzer_model, 
-                        transaction_model=models['transaction'],
-                        visualizer_model=models["visualizer"])
+analyzer = FinanceAnalyzer(models["transaction"])
 
-    elif page == "Category":
-        # get category_model from models
-        category_model = models['category']
+if page == "Home":
+    st.title("🏠 Tổng quan")
+    render_dashboard(
+        analyzer_model=analyzer,
+        transaction_model=models["transaction"],
+        visualizer_model=models["visualizer"],
+    )
 
-        # display category views
-        render_categories(category_model=category_model)
+elif page == "Category":
+    st.title("📂 Danh mục")
+    render_categories(category_model=models["category"])
 
-    elif page == "Transaction":
-        # get category_model and transaction from models
-        category_model = models['category']
-        transaction_model = models['transaction']
+elif page == "Transaction":
+    st.title("💸 Giao dịch")
+    render_transactions(
+        transaction_model=models["transaction"],
+        category_model=models["category"],
+    )
 
-        # display transaction views
-        render_transactions(transaction_model=transaction_model, category_model=category_model)
-    elif page == "Budget":
-        budget_model = models["budget"]
-        # dùng luôn category_model nếu cần dropdown category
-        category_model = models["category"]
-        render_budgets(budget_model=budget_model,
-                       category_model=category_model)
+elif page == "Budget":
+    st.title("📊 Ngân sách")
+    render_budgets(
+        budget_model=models["budget"],
+        category_model=models["category"],
+    )
