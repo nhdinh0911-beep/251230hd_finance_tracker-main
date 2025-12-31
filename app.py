@@ -57,17 +57,17 @@ from views import (
 # =====================================================
 # Init models (cache per session)
 # =====================================================
-@st.cache_resource
-def init_models(db):
+def init_models():
     return {
-        "user": UserModel(db),
-        "category": CategoryModel(db),
-        "transaction": TransactionModel(db),
-        "budget": BudgetModel(db),
+        "category": CategoryModel(),
+        "transaction": TransactionModel(),
+        "user": UserModel(),
         "visualizer": FinanceVisualizer(),
+        "budget": BudgetModel(),
     }
 
-models = init_models(db)
+
+models = init_models()
 
 # =====================================================
 # Auth UI
