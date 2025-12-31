@@ -10,15 +10,29 @@ import config
 class BudgetModel:
     def __init__(self, user_id: Optional[str] = None):
         self.db_manager = DatabaseManager()
+
         self.collection = self.db_manager.get_collection(
             config.COLLECTIONS["budget"]
         )
+
         self.transaction_collection = self.db_manager.get_collection(
             config.COLLECTIONS["transaction"]
         )
+
         self.user_id: Optional[ObjectId] = None
         if user_id:
             self.set_user_id(user_id)
+
+        # ✅ đảm bảo 1 user + 1 category + 1 month + 1 year chỉ có 1 budget
+        try:
+            self.collection.create_index(
+                [("user_id", 1), ("category", 1), ("month", 1), ("year", 1)],
+                unique=True
+            )
+        except Exception:
+            # tránh crash nếu DB đã có data trùng
+            pass
+
 
     # -----------------------------
     # Helper
