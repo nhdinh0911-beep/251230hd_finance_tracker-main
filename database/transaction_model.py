@@ -208,3 +208,24 @@ class TransactionModel:
         ]
         out = list(self.collection.aggregate(pipeline))
         return float(out[0]["total"]) if out else 0.0
+    # ==================================================
+    # Compatibility helper for Analyzer (DO NOT REMOVE)
+    # ==================================================
+    def get_transactions_by_date_range(
+        self,
+        start_date,
+        end_date,
+        tx_type: str | None = None,
+    ):
+        """
+        Adapter method for Analyzer.
+        This keeps old analyzer code working without refactor.
+        """
+
+        return self.get_transactions(
+            tx_type=tx_type,
+            start_date=start_date,
+            end_date=end_date,
+            limit=10_000
+        )
+
